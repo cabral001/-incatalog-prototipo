@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content">
+<title>InCatalog</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+<script>
+tailwind.config = {
+  darkMode:"class",
+  theme:{extend:{
+    colors:{
+      "primary":"#001f4c","primary-container":"#033473","on-primary":"#ffffff",
+      "on-primary-container":"#7d9fe4","secondary":"#006398","secondary-container":"#5bb8fe",
+      "on-secondary":"#ffffff","on-secondary-container":"#00476e","tertiary":"#001d54",
+      "surface":"#faf8ff","surface-container":"#eaedff","surface-container-low":"#f2f3ff",
+      "surface-container-high":"#e2e7ff","surface-container-highest":"#dae2fd",
+      "surface-container-lowest":"#ffffff","on-surface":"#131b2e","on-surface-variant":"#434750",
+      "outline":"#747781","outline-variant":"#c4c6d2","error":"#ba1a1a",
+      "error-container":"#ffdad6","on-error-container":"#93000a",
+      "inverse-surface":"#283044","inverse-primary":"#adc6ff",
+    },
+    spacing:{
+      "margin-screen":"1rem","gutter-stack":"0.75rem","touch-min":"3.5rem",
+      "thumb-zone-bottom":"5.5rem","card-pad-inner":"1rem","card-pad-comfortable":"1.25rem",
+    },
+    borderRadius:{"DEFAULT":"0.25rem","lg":"0.5rem","xl":"0.75rem","2xl":"1rem","full":"9999px"},
+  }}
+}
+</script>
+<style>
+  *{-webkit-tap-highlight-color:transparent;box-sizing:border-box}
+  html,body{background:#faf8ff;margin:0;}
+  body{font-family:'Inter',sans-serif;background:#faf8ff;display:flex;justify-content:center;align-items:center;min-height:100vh}
+  .material-symbols-outlined{font-family:'Material Symbols Outlined';font-weight:normal;font-style:normal;font-size:24px;line-height:1;display:inline-block;text-transform:none;letter-spacing:normal;word-wrap:normal;white-space:nowrap;direction:ltr;font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 24}
+
+  /* ── SHELL ── */
+  #app{width:390px;height:844px;background:#faf8ff;border-radius:40px;overflow:hidden;position:relative;box-shadow:0 24px 80px rgba(0,0,0,.35);display:flex;flex-direction:column}
+  @media(max-width:600px){
+    html,body{width:100%;height:100%;margin:0;padding:0;background:#faf8ff;overflow:hidden;display:block}
+    #app{position:fixed;inset:0;width:100%;height:100dvh;max-width:none;border-radius:0;box-shadow:none}
+  }
+
+  /* ── SCREENS ── */
+  .screen{position:absolute;inset:0;display:flex;flex-direction:column;background:#faf8ff;overflow:hidden;transition:opacity .25s ease;opacity:0;pointer-events:none;}
+  .screen.active{opacity:1;pointer-events:all;}
+  .screen.out{opacity:0;}
+
+  /* ── ANIMATIONS ── */
+  @keyframes pulse-ring{0%{transform:scale(.95);box-shadow:0 0 0 0 rgba(3,52,115,.4)}70%{transform:scale(1.05);box-shadow:0 0 0 20px rgba(3,52,115,0)}100%{transform:scale(.95);box-shadow:0 0 0 0 rgba(3,52,115,0)}}
+  .pulse-tactile{animation:pulse-ring 2.4s infinite cubic-bezier(.4,0,.6,1)}
+  @keyframes wavePulse{0%,100%{transform:scaleY(.35)}50%{transform:scaleY(1)}}
+  .wave-bar{animation:wavePulse 1.2s ease-in-out infinite;transform-origin:center}
+  @keyframes aiAura{0%,100%{box-shadow:0 0 0 0 rgba(91,184,254,.4),0 8px 24px -4px rgba(3,52,115,.16)}50%{box-shadow:0 0 0 8px rgba(91,184,254,0),0 12px 28px -4px rgba(3,52,115,.25)}}
+  .ai-card-glow{animation:aiAura 2.5s infinite}
+  @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+  .spin-icon{animation:spin 2s linear infinite}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+  .fade-in{animation:fadeIn .4s ease forwards}
+  @keyframes checkPop{0%{transform:scale(0)}70%{transform:scale(1.2)}100%{transform:scale(1)}}
+  .check-pop{animation:checkPop .4s cubic-bezier(.175,.885,.32,1.275) forwards}
+  @keyframes progressBar{from{width:0}to{width:100%}}
+  .recording-bg{background:linear-gradient(135deg,#033473 0%,#006398 100%)}
+  .blink{animation:pulse-ring 1s ease-in-out infinite}
+
+  /* scrollable areas */
+  .scroll-area{overflow-y:auto;-webkit-overflow-scrolling:touch}
+  .scroll-area::-webkit-scrollbar{display:none}
+
+  /* toast */
+  #toast{position:absolute;bottom:100px;left:50%;transform:translateX(-50%);background:#033473;color:#fff;padding:10px 20px;border-radius:50px;font-size:13px;font-weight:600;white-space:nowrap;opacity:0;transition:opacity .3s;pointer-events:none;z-index:100}
+  #toast.show{opacity:1}
+</style>
+</head>
+<body>
+<div id="app">
+<!-- ══════════════════════════════════════════
+     TELA 0 — LISTA DE ATIVOS
+══════════════════════════════════════════ -->
+<div class="screen active" id="s0">
+  <header class="bg-white border-b border-outline-variant flex justify-between items-center px-4 shrink-0" style="height:56px">
+    <div class="flex items-center gap-2">
+      <div class="w-7 h-7 rounded-md bg-primary-container flex items-center justify-center">
+        <span class="material-symbols-outlined text-white" style="font-size:16px">auto_awesome</span>
+      </div>
+      <div>
+        <span class="text-sm font-bold text-primary block leading-none">InCatalog</span>
+        <span class="text-[10px] text-on-surface-variant font-mono">Téc. Marcos Silva | Fábrica Sul</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="px-4 pt-3 pb-2 shrink-0 space-y-3">
+    <div class="flex items-center justify-between">
+      <h2 class="text-lg font-bold text-primary">Ativos</h2>
+      <span class="text-[10px] font-mono text-on-surface-variant">4 equipamentos</span>
+    </div>
+    <div class="flex items-center gap-2 bg-white border border-outline-variant rounded-xl px-3 h-10">
+      <span class="material-symbols-outlined text-on-surface-variant" style="font-size:18px">search</span>
+      <span class="text-xs text-on-surface-variant">Buscar por nome ou tag</span>
+    </div>
+  </div>
+
+  <div class="scroll-area flex-1 px-4 pt-1 pb-24 space-y-2.5">
+    <button onclick="goTo('s1')" class="w-full bg-white border border-outline-variant rounded-xl p-3 shadow-sm flex items-center gap-3 text-left active:scale-[0.98] transition-transform" type="button">
+      <div class="w-11 h-11 rounded-xl bg-surface-container-high flex items-center justify-center text-primary shrink-0"><span class="material-symbols-outlined">ac_unit</span></div>
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center justify-between gap-2"><span class="text-[10px] font-mono text-on-surface-variant">AC-03-C</span></div>
+        <p class="text-sm font-bold text-on-surface truncate">Ar-condicionado split</p>
+        <p class="text-[11px] text-on-surface-variant truncate">Sala de Reuniões 01 • Bloco C</p>
+      </div>
+      <span class="material-symbols-outlined text-on-surface-variant">chevron_right</span>
+    </button>
+    <button onclick="showToast('Sem fluxo neste protótipo', 1500)" class="w-full bg-white border border-outline-variant rounded-xl p-3 shadow-sm flex items-center gap-3 text-left active:scale-[0.98] transition-transform" type="button">
+      <div class="w-11 h-11 rounded-xl bg-surface-container-high flex items-center justify-center text-primary shrink-0"><span class="material-symbols-outlined">print</span></div>
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center justify-between gap-2"><span class="text-[10px] font-mono text-on-surface-variant">IMP-01</span></div>
+        <p class="text-sm font-bold text-on-surface truncate">Impressora multifuncional</p>
+        <p class="text-[11px] text-on-surface-variant truncate">Setor Administrativo • Bloco B</p>
+      </div>
+      <span class="material-symbols-outlined text-on-surface-variant">chevron_right</span>
+    </button>
+    <button onclick="showToast('Sem fluxo neste protótipo', 1500)" class="w-full bg-white border border-outline-variant rounded-xl p-3 shadow-sm flex items-center gap-3 text-left active:scale-[0.98] transition-transform" type="button">
+      <div class="w-11 h-11 rounded-xl bg-surface-container-high flex items-center justify-center text-primary shrink-0"><span class="material-symbols-outlined">water_drop</span></div>
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center justify-between gap-2"><span class="text-[10px] font-mono text-on-surface-variant">BOM-01</span></div>
+        <p class="text-sm font-bold text-on-surface truncate">Bomba d'água</p>
+        <p class="text-[11px] text-on-surface-variant truncate">Caixa d'água • Bloco A</p>
+      </div>
+      <span class="material-symbols-outlined text-on-surface-variant">chevron_right</span>
+    </button>
+    <button onclick="showToast('Sem fluxo neste protótipo', 1500)" class="w-full bg-white border border-outline-variant rounded-xl p-3 shadow-sm flex items-center gap-3 text-left active:scale-[0.98] transition-transform" type="button">
+      <div class="w-11 h-11 rounded-xl bg-surface-container-high flex items-center justify-center text-primary shrink-0"><span class="material-symbols-outlined">air</span></div>
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center justify-between gap-2"><span class="text-[10px] font-mono text-on-surface-variant">EXA-02</span></div>
+        <p class="text-sm font-bold text-on-surface truncate">Exaustor</p>
+        <p class="text-[11px] text-on-surface-variant truncate">Cozinha do refeitório • Bloco D</p>
+      </div>
+      <span class="material-symbols-outlined text-on-surface-variant">chevron_right</span>
+    </button>
+  </div>
+
+  <nav class="absolute bottom-0 left-0 right-0 h-14 bg-white border-t border-outline-variant flex justify-around items-center px-4">
+    <a class="flex flex-col items-center justify-center text-on-surface-variant px-3 py-1 gap-0.5 w-16" href="#">
+      <span class="material-symbols-outlined text-xl">biotech</span>
+      <span class="text-[9px]">Diagnóstico</span>
+    </a>
+    <a class="flex flex-col items-center justify-center text-on-surface-variant px-3 py-1 gap-0.5 w-16" href="#">
+      <span class="material-symbols-outlined text-xl">assignment</span>
+      <span class="text-[9px]">Ordens</span>
+    </a>
+    <a class="flex flex-col items-center justify-center bg-primary-container text-white rounded-xl px-3 py-1 gap-0.5 w-16" href="#">
+      <span class="material-symbols-outlined text-xl" style="font-variation-settings:'FILL' 1">build</span>
+      <span class="text-[9px] font-bold">Equipamentos</span>
+    </a>
+    <a class="flex flex-col items-center justify-center text-on-surface-variant px-3 py-1 gap-0.5 w-16" href="#">
+      <span class="material-symbols-outlined text-xl">person</span>
+      <span class="text-[9px]">Perfil</span>
+    </a>
+  </nav>
+</div>
+
+
+
+<!-- ══════════════════════════════════════════
+     TELA 1 — REGISTRO
+══════════════════════════════════════════ -->
+<div class="screen" id="s1">
+  <!-- header -->
+  <header class="bg-white border-b border-outline-variant flex justify-between items-center px-4 shrink-0" style="height:56px">
+    <div class="flex items-center gap-2">
+      <div class="w-7 h-7 rounded-md bg-primary-container flex items-center justify-center">
+        <span class="material-symbols-outlined text-white text-sm" style="font-size:16px">auto_awesome</span>
+      </div>
+      <div>
+        <span class="text-sm font-bold text-primary block leading-none">InCatalog</span>
+        <span class="text-[10px] text-on-surface-variant font-mono">Téc. Marcos Silva | Fábrica Sul</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- progress -->
+  <div class="px-4 pt-3 shrink-0">
+    <div class="flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <button onclick="goTo('s0')" class="w-8 h-8 -ml-2 rounded-full flex items-center justify-center text-primary active:scale-95" type="button" aria-label="Voltar"><span class="material-symbols-outlined">arrow_back</span></button><span class="flex items-center justify-center w-6 h-6 rounded-full bg-primary-container text-white text-[11px] font-bold">1</span>
+        <span class="text-sm font-semibold text-primary">Passo 1: Registro</span>
+      </div>
+      <span class="text-[11px] text-on-surface-variant font-mono">Etapa 1 de 3</span>
+    </div>
+    <div class="w-full bg-surface-container-high h-1.5 rounded-full mt-2 overflow-hidden flex">
+      <div class="bg-primary-container h-full rounded-full" style="width:33%"></div>
+    </div>
+  </div>
+
+  <!-- content -->
+  <div class="scroll-area flex-1 px-4 py-3 space-y-3 pb-40">
+    <!-- equipment card -->
+    <div class="bg-white border border-outline-variant rounded-xl shadow-sm overflow-hidden">
+      <div class="h-1 bg-gradient-to-r from-secondary to-primary-container"></div>
+      <div class="p-4 space-y-3">
+        <div class="inline-flex items-center gap-1.5 bg-amber-50 text-amber-900 border border-amber-300 px-2.5 py-1 rounded-full">
+          <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+          <span class="text-[10px] font-bold font-mono">Alerta de Anomalia</span>
+        </div>
+        <div>
+          <h1 class="text-lg font-bold text-primary">Ar-condicionado split - Sala de Reuniões 01</h1>
+          <div class="flex items-center gap-3 mt-1">
+            <span class="text-[11px] font-mono bg-surface-container-low text-primary px-2 py-0.5 rounded border border-outline-variant">#AC-2024-031</span>
+            <span class="text-xs text-on-surface-variant flex items-center gap-1">
+              <span class="material-symbols-outlined" style="font-size:14px">location_on</span>
+              Bloco C - Piso 2
+            </span>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-2 pt-2 border-t border-surface-container-high">
+          <div class="bg-surface-container-low p-2 rounded-lg">
+            <span class="text-[10px] text-on-surface-variant block font-mono">Tempo de uso</span>
+            <span class="text-[12px] font-bold text-primary font-mono">5 anos</span>
+          </div>
+          <div class="bg-surface-container-low p-2 rounded-lg">
+            <span class="text-[10px] text-on-surface-variant block font-mono">Última Revisão</span>
+            <span class="text-[12px] font-bold text-primary font-mono">14/Set (Preventiva)</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  <!-- bottom action zone -->
+  <div class="absolute bottom-14 left-0 right-0 px-4 pb-4 bg-white/95 border-t border-outline-variant pt-4 shadow-sm">
+    <p class="text-sm font-semibold text-primary text-center mb-3">Descreva o problema detectado</p>
+    <div class="flex flex-col items-center gap-3">
+      <!-- text input -->
+      <textarea id="relatorioText" onfocus="setTimeout(()=>this.scrollIntoView({block:'center'}),300)" style="font-size:16px" class="w-full bg-white border border-outline-variant rounded-2xl p-3 text-xs font-body-md resize-none focus:outline-none focus:ring-2 focus:ring-primary-container placeholder:text-on-surface-variant" rows="4" placeholder="" style="font-family:'Inter',sans-serif"></textarea>
+      
+      <!-- enviar button -->
+      <button id="btnEnviarRelatorio" class="w-full h-12 bg-primary-container text-white rounded-xl px-4 flex items-center justify-center gap-2 text-xs font-semibold shadow-sm active:scale-95 transition-transform hover:bg-primary">
+        <span class="material-symbols-outlined text-lg" style="font-variation-settings:'FILL' 1">send</span>
+        <span>Enviar para Análise</span>
+      </button>
+
+      <!-- secondary actions -->
+      <div class="grid grid-cols-2 gap-2 w-full">
+        <button class="h-11 bg-white border border-primary-container text-primary-container rounded-xl px-3 flex items-center justify-center gap-1.5 text-xs font-semibold shadow-sm active:scale-95 transition-transform hover:bg-surface-container" type="button">
+          <span class="material-symbols-outlined" style="font-size:18px">photo_camera</span>
+          <span>Foto da Avaria</span>
+        </button>
+        <button class="h-11 bg-white border border-primary-container text-primary-container rounded-xl px-3 flex items-center justify-center gap-1.5 text-xs font-semibold shadow-sm active:scale-95 transition-transform hover:bg-surface-container" type="button">
+          <span class="material-symbols-outlined" style="font-size:18px">attachment</span>
+          <span>Anexar Arquivo</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- bottom nav -->
+  <nav class="absolute bottom-0 left-0 right-0 h-14 bg-white border-t border-outline-variant flex justify-around items-center px-4 shadow-[0_-4px_16px_rgba(3,52,115,0.06)]">
+    <a class="flex flex-col items-center justify-center bg-primary-container text-white rounded-xl px-3 py-1 gap-0.5 w-16" href="#">
+      <span class="material-symbols-outlined text-xl" style="font-variation-settings:'FILL' 1">biotech</span>
+      <span class="text-[9px] font-bold">Diagnóstico</span>
+    </a>
+    <a class="flex flex-col items-center justify-center text-on-surface-variant px-3 py-1 gap-0.5 w-16" href="#">
+      <span class="material-symbols-outlined text-xl">assignment</span>
+      <span class="text-[9px]">Ordens</span>
+    </a>
+    <a class="flex flex-col items-center justify-center text-on-surface-variant px-3 py-1 gap-0.5 w-16" href="#">
+      <span class="material-symbols-outlined text-xl">build</span>
+      <span class="text-[9px]">Equipamentos</span>
+    </a>
+    <a class="flex flex-col items-center justify-center text-on-surface-variant px-3 py-1 gap-0.5 w-16" href="#">
+      <span class="material-symbols-outlined text-xl">person</span>
+      <span class="text-[9px]">Perfil</span>
+    </a>
+  </nav>
+</div>
+
+
+<!-- ══════════════════════════════════════════
+     TELA 2 — ANÁLISE IA
+══════════════════════════════════════════ -->
+<div class="screen" id="s2">
+  <!-- header -->
+  <header class="bg-white border-b border-outline-variant flex justify-between items-center px-4 shrink-0" style="height:56px">
+    <div class="flex items-center gap-2">
+      <div class="w-7 h-7 rounded-md bg-primary-container flex items-center justify-center">
+        <span class="material-symbols-outlined text-white" style="font-size:16px">auto_awesome</span>
+      </div>
+      <span class="text-sm font-bold text-primary">InCatalog</span>
+    </div>
+    <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface-container border border-outline-variant/60">
+      <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+      <span class="text-[10px] text-on-surface-variant font-mono">Téc. Carlos M.</span>
+    </div>
+  </header>
+
+  <!-- stepper -->
+  <div class="px-4 pt-3 pb-2 shrink-0 border-b border-outline-variant/30">
+    <div class="flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <span class="px-2 py-0.5 rounded bg-primary-container text-white text-[10px] font-mono font-bold">PASSO 2 DE 3</span>
+        <span class="text-lg font-bold text-primary">Diagnóstico I.A.</span>
+      </div>
+      <div class="flex items-center gap-1">
+        <span class="w-5 h-1.5 rounded-full bg-primary-container"></span>
+        <span class="w-5 h-1.5 rounded-full bg-secondary-container animate-pulse"></span>
+        <span class="w-2 h-1.5 rounded-full bg-outline-variant/50"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- content -->
+  <div class="scroll-area flex-1 px-4 py-3 space-y-3 pb-20">
+    <!-- ativo -->
+    <div class="bg-white rounded-xl border border-outline-variant shadow-sm p-3 flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <div class="w-9 h-9 rounded-lg bg-surface-container flex items-center justify-center text-primary-container border border-outline-variant/40">
+          <span class="material-symbols-outlined" style="font-size:20px;font-variation-settings:'FILL' 1">electric_bolt</span>
+        </div>
+        <div>
+          <span class="text-[10px] font-mono text-on-surface-variant block">#AC-2024-031</span>
+          <span class="text-sm font-semibold text-on-surface">Ar-condicionado split - Sala de Reuniões 01</span>
+          <span class="text-[10px] text-on-surface-variant block">Setor Administrativo • Bloco C</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- text balloon -->
+    <div>
+      <div class="flex items-center justify-between px-1 mb-1.5">
+        <span class="text-[10px] text-on-surface-variant font-mono uppercase tracking-wider">Relato do Técnico</span>
+        <span class="text-[10px] text-on-surface-variant font-mono">14:32</span>
+      </div>
+      <div class="bg-white border border-outline-variant rounded-2xl p-3 shadow-sm space-y-2.5">
+        <!-- text bubble -->
+        <div class="bg-surface-container-low border border-outline-variant/50 rounded-xl p-3">
+          <div class="flex items-center gap-1.5 mb-2">
+            <span class="material-symbols-outlined text-secondary" style="font-size:16px">edit_note</span>
+            <span class="text-[10px] text-on-surface-variant font-mono">Descrição digitada</span>
+          </div>
+          <p id="relatorioDisplay" class="text-xs font-semibold text-on-surface leading-relaxed">Ar não gela e tá pingando água no chão.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI processing card -->
+    <div class="relative bg-white rounded-2xl border border-secondary-container/80 p-4 shadow-[0_8px_24px_-4px_rgba(3,52,115,0.16)] ai-card-glow overflow-hidden">
+      <div class="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-secondary to-secondary-container"></div>
+      <div class="flex items-center gap-3 mb-3">
+        <div class="w-11 h-11 rounded-2xl bg-primary-container flex items-center justify-center text-secondary-container shrink-0">
+          <span class="material-symbols-outlined text-2xl" style="font-variation-settings:'FILL' 1">psychology</span>
+        </div>
+        <div class="flex-1">
+          <div class="flex items-center justify-between">
+            <span class="text-[10px] font-mono text-secondary font-bold uppercase tracking-wider">InCatalog Neural Engine</span>
+            <span id="aiStatus" class="px-2 py-0.5 rounded-full bg-secondary-container/20 text-on-secondary-container text-[10px] font-mono font-semibold animate-pulse">Processando</span>
+          </div>
+          <h3 id="aiTitle" class="text-sm font-bold text-primary mt-0.5">Analisando relato, cruzando com o manual técnico...</h3>
+        </div>
+      </div>
+
+      <!-- steps -->
+      <div class="bg-surface-container-low/80 rounded-xl p-3 border border-outline-variant/40 space-y-2.5">
+        <!-- step 1 -->
+        <div class="flex items-center gap-2.5">
+          <div id="step1icon" class="w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 border border-emerald-300">
+            <span class="material-symbols-outlined" style="font-size:14px">check</span>
+          </div>
+          <div class="flex-1 flex justify-between items-center">
+            <span class="text-xs text-on-surface font-medium">Relato processado</span>
+            <span class="text-[10px] text-emerald-700 font-mono font-semibold">100%</span>
+          </div>
+        </div>
+        <div class="w-full h-px bg-outline-variant/30 ml-3"></div>
+        <!-- step 2 -->
+        <div class="flex items-center gap-2.5">
+          <div id="step2icon" class="w-6 h-6 rounded-full bg-secondary-container/30 text-secondary flex items-center justify-center shrink-0 border border-secondary-container">
+            <span class="material-symbols-outlined spin-icon" id="step2spinner" style="font-size:14px">sync</span>
+          </div>
+          <div class="flex-1 flex justify-between items-center">
+            <span id="step2label" class="text-xs text-primary font-semibold">Consultando manual do fabricante</span>
+            <span id="step2status" class="text-[10px] text-secondary font-mono font-bold">Ativo...</span>
+          </div>
+        </div>
+        <div class="w-full h-px bg-outline-variant/30 ml-3"></div>
+        <!-- step 3 -->
+        <div id="step3row" class="flex items-center gap-2.5 opacity-60">
+          <div id="step3icon" class="w-6 h-6 rounded-full bg-surface-container text-outline flex items-center justify-center shrink-0 border border-outline-variant">
+            <span class="material-symbols-outlined" id="step3spinner" style="font-size:14px">radio_button_unchecked</span>
+          </div>
+          <div class="flex-1 flex justify-between items-center">
+            <span class="text-xs text-on-surface-variant">Estimando falha e sobressalentes</span>
+            <span id="step3status" class="text-[10px] text-outline font-mono">Aguardando</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-3 flex items-center justify-between text-on-surface-variant text-[10px] font-mono pt-1">
+        <span class="flex items-center gap-1">
+          <span class="material-symbols-outlined" style="font-size:12px">model_training</span>
+          Modelo: HVAC-Diag-v2.1
+        </span>
+        <span class="text-secondary font-medium">Latência ~1.4s</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- bottom nav -->
+  <nav class="absolute bottom-0 left-0 right-0 h-14 bg-white border-t border-outline-variant flex justify-around items-center px-4">
+    <a class="flex flex-col items-center justify-center bg-primary-container text-white rounded-xl px-3 py-1 gap-0.5 w-16" href="#">
+      <span class="material-symbols-outlined text-xl" style="font-variation-settings:'FILL' 1">biotech</span>
+      <span class="text-[9px] font-bold">Diagnóstico</span>
+    </a>
+    <a class="flex flex-col items-center justify-center text-on-surface-variant px-3 py-1 gap-0.5 w-16" href="#">
+      <span class="material-symbols-outlined text-xl">assignment</span>
+      <span class="text-[9px]">Ordens</span>
+    </a>
+    <a class="flex flex-col items-center justify-center text-on-surface-variant px-3 py-1 gap-0.5 w-16" href="#">
+      <span class="material-symbols-outlined text-xl">build</span>
+      <span class="text-[9px]">Equipamentos</span>
+    </a>
+    <a class="flex flex-col items-center justify-center text-on-surface-variant px-3 py-1 gap-0.5 w-16" href="#">
+      <span class="material-symbols-outlined text-xl">person</span>
+      <span class="text-[9px]">Perfil</span>
+    </a>
+  </nav>
+</div>
+
+
+<!-- ══════════════════════════════════════════
+     TELA 3 — ORDEM DE SERVIÇO GERADA
+══════════════════════════════════════════ -->
+<div class="screen" id="s3">
+  <!-- header -->
+  <header class="bg-white border-b border-outline-variant flex justify-between items-center px-4 shrink-0" style="height:56px">
+    <div class="flex items-center gap-2">
+      <div class="w-7 h-7 rounded-md bg-primary-container flex items-center justify-center">
+        <span class="material-symbols-outlined text-white" style="font-size:16px">auto_awesome</span>
+      </div>
+      <span class="text-sm font-bold text-primary">InCatalog</span>
+    </div>
+    <div class="flex items-center gap-1.5 bg-surface-container-low px-2.5 py-1 rounded-full border border-outline-variant/60">
+      <span class="w-2 h-2 rounded-full bg-secondary animate-ping"></span>
+      <span class="text-[10px] font-mono font-semibold text-primary">Aguardando aprovação</span>
+    </div>
+  </header>
+
+  <!-- stepper -->
+  <div class="bg-white px-4 pt-3 pb-2.5 border-b border-outline-variant/30 flex items-center justify-between shrink-0">
+    <div class="flex items-center gap-2">
+      <span class="text-[10px] font-mono text-secondary font-bold tracking-wider">PASSO 3 DE 3</span>
+      <span class="text-outline-variant text-xs">|</span>
+      <span class="text-[11px] text-on-surface-variant font-medium">Ordem Gerada</span>
+    </div>
+    <div class="flex items-center gap-1.5">
+      <span class="w-5 h-1.5 rounded-full bg-primary-container"></span>
+      <span class="w-5 h-1.5 rounded-full bg-primary-container"></span>
+      <span class="w-5 h-1.5 rounded-full bg-secondary-container"></span>
+    </div>
+  </div>
+
+  <!-- content -->
+  <div class="scroll-area flex-1 px-4 pt-4 space-y-3 pb-40">
+    <!-- seletor de visão -->
+    <div class="flex bg-surface-container rounded-xl p-1 border border-outline-variant/60">
+      <button id="tabGestor" onclick="setView('gestor')" class="flex-1 h-8 rounded-lg text-xs font-semibold transition-all" type="button">Visão do Gestor</button>
+      <button id="tabTecnico" onclick="setView('tecnico')" class="flex-1 h-8 rounded-lg text-xs font-semibold transition-all" type="button">Visão Técnica</button>
+    </div>
+
+    <!-- status de aprovação -->
+    <div class="flex items-center gap-2 bg-amber-50 border border-amber-300 text-amber-900 rounded-xl px-3 py-2">
+      <span class="material-symbols-outlined" style="font-size:18px">pending_actions</span>
+      <span class="text-xs font-semibold">Aguardando aprovação do supervisor</span>
+    </div>
+
+    <!-- VISÃO DO GESTOR -->
+    <div id="viewGestor" class="space-y-3">
+      <div class="bg-white rounded-2xl border border-outline-variant shadow-sm p-4 space-y-3">
+        <div class="flex items-center justify-between">
+          <span class="text-[10px] font-mono bg-amber-50 text-amber-700 border border-amber-300 px-2 py-0.5 rounded font-bold">PRIORIDADE MÉDIA</span>
+          <span class="text-[10px] font-mono text-on-surface-variant">OS #9420-AC</span>
+        </div>
+        <h2 class="text-base font-bold text-on-surface">Ar-condicionado sem refrigeração</h2>
+        <p class="text-xs text-on-surface leading-relaxed">Ar-condicionado parou de refrigerar e vaza água. Sem tratamento, risco de infiltração no forro e dano ao compressor em até 24 horas.</p>
+        <div class="grid grid-cols-2 gap-2">
+          <div class="bg-surface-container-low rounded-lg p-2">
+            <span class="text-[9px] text-on-surface-variant block">Impacto</span>
+            <span class="text-xs font-bold text-amber-600">Médio</span>
+          </div>
+          <div class="bg-surface-container-low rounded-lg p-2">
+            <span class="text-[9px] text-on-surface-variant block">Tempo previsto</span>
+            <span class="text-xs font-bold text-primary">1h</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- evidências -->
+      <div class="bg-white rounded-2xl border border-outline-variant shadow-sm p-4 space-y-3">
+        <h3 class="text-[10px] font-bold text-on-surface uppercase tracking-wider">Evidências usadas pela IA</h3>
+        <div class="flex gap-2.5">
+          <span class="material-symbols-outlined text-secondary shrink-0" style="font-size:18px">record_voice_over</span>
+          <div>
+            <p class="text-xs font-semibold text-on-surface">Relato do técnico</p>
+            <p id="evidRelato" class="text-[11px] text-on-surface-variant italic">"Ar não gela e tá pingando água no chão."</p>
+          </div>
+        </div>
+        <div class="flex gap-2.5">
+          <span class="material-symbols-outlined text-secondary shrink-0" style="font-size:18px">history</span>
+          <div>
+            <p class="text-xs font-semibold text-on-surface">Histórico do equipamento</p>
+            <p class="text-[11px] text-on-surface-variant">2 ocorrências anteriores nesta sala, ambas resolvidas com limpeza do filtro e recarga de gás.</p>
+          </div>
+        </div>
+        <div class="flex gap-2.5">
+          <span class="material-symbols-outlined text-secondary shrink-0" style="font-size:18px">menu_book</span>
+          <div>
+            <p class="text-xs font-semibold text-on-surface">Manual do fabricante</p>
+            <p class="text-[11px] text-on-surface-variant">Filtro obstruído e baixa de gás reduzem a troca térmica e causam gelo, vazamento ou ruído.</p>
+          </div>
+        </div>
+        <div class="flex gap-2.5">
+          <span class="material-symbols-outlined text-secondary shrink-0" style="font-size:18px">thermostat</span>
+          <div>
+            <p class="text-xs font-semibold text-on-surface">Leitura de sensores</p>
+            <p class="text-[11px] text-on-surface-variant">Temperatura de insuflamento 6°C acima do ideal para o ajuste configurado.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- causas descartadas -->
+      <details class="bg-white rounded-2xl border border-outline-variant shadow-sm overflow-hidden">
+        <summary class="flex items-center justify-between p-4 cursor-pointer select-none">
+          <span class="text-xs font-bold text-on-surface">Outras causas consideradas</span>
+          <span class="material-symbols-outlined text-on-surface-variant" style="font-size:18px">expand_more</span>
+        </summary>
+        <div class="px-4 pb-4 space-y-2 text-[11px] text-on-surface-variant border-t border-outline-variant/30 pt-3">
+          <p><span class="font-semibold text-on-surface">Compressor com desgaste (14%):</span> descartada, pois a corrente elétrica do compressor está normal.</p>
+          <p><span class="font-semibold text-on-surface">Sensor de temperatura com defeito (5%):</span> descartada, pois a leitura confere com termômetro manual.</p>
+        </div>
+      </details>
+    </div>
+
+    <!-- VISÃO TÉCNICA (detalhes) -->
+    <div id="viewTecnica" class="hidden space-y-3">
+
+    <!-- mini ativo -->
+    <div class="bg-white rounded-xl border border-outline-variant p-3 shadow-sm flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-lg bg-surface-container-high flex items-center justify-center text-primary border border-outline-variant/40">
+          <span class="material-symbols-outlined" style="font-size:18px">bolt</span>
+        </div>
+        <div>
+          <div class="flex items-center gap-1.5">
+            <span class="text-[10px] font-mono text-on-surface-variant">TAG: AC-03-C</span>
+            <span class="w-1 h-1 rounded-full bg-outline inline-block"></span>
+            <span class="text-[10px] font-mono text-primary font-bold">OPERACIONAL LIMITADO</span>
+          </div>
+          <p class="text-sm font-bold text-on-surface">Ar-condicionado split - Sala de Reuniões 01</p>
+          <p class="text-[10px] text-on-surface-variant flex items-center gap-1 mt-0.5">
+            <span class="material-symbols-outlined" style="font-size:12px">location_on</span>
+            Bloco C • Sala de Reuniões 01
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- diagnóstico card -->
+    <article class="bg-white rounded-2xl border border-outline-variant shadow-sm overflow-hidden fade-in">
+      <div class="h-1 bg-gradient-to-r from-secondary to-secondary-container"></div>
+      <div class="p-4 space-y-3">
+        <div class="flex items-center justify-between gap-2">
+          <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-300">
+            <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+            <span class="text-[10px] font-mono text-amber-700 font-bold">[PRIORIDADE MÉDIA]</span>
+          </div>
+          <span class="text-[10px] font-mono text-on-surface-variant bg-surface-container px-2 py-0.5 rounded">OS #9420-AC</span>
+        </div>
+        <div>
+          <span class="text-[10px] font-mono text-secondary font-semibold uppercase tracking-wider">Falha Diagnosticada</span>
+          <h2 class="text-base font-bold text-on-surface mt-0.5">Hipótese Principal</h2>
+        </div>
+        <div class="bg-surface-container-low rounded-xl p-3 border border-outline-variant/50 text-xs text-on-surface-variant leading-relaxed">
+          Filtro obstruído por poeira e possível baixa de gás refrigerante. A drenagem comprometida explica o vazamento de água.
+        </div>
+        <!-- outras hipóteses -->
+        <details class="rounded-xl border border-outline-variant/50 bg-surface-container-low/60 overflow-hidden">
+          <summary class="flex items-center justify-between p-3 cursor-pointer select-none hover:bg-surface-container transition-all">
+            <div class="flex items-center gap-2">
+              <span class="material-symbols-outlined text-secondary" style="font-size:16px">alt_route</span>
+              <span class="text-xs font-bold text-on-surface">Outras Hipóteses Avaliadas</span>
+              <span class="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-surface-container-high text-primary font-bold">2</span>
+            </div>
+            <span class="material-symbols-outlined text-on-surface-variant" style="font-size:16px">expand_more</span>
+          </summary>
+          <div class="px-3 pb-3 pt-1 space-y-2 border-t border-outline-variant/30">
+            <div class="p-2.5 rounded-lg bg-white border border-outline-variant/40 flex items-center justify-between">
+              <div>
+                <p class="text-xs font-semibold text-on-surface">Baixa de gás refrigerante</p>
+                <p class="text-[10px] text-on-surface-variant">Pressão de sucção abaixo do esperado</p>
+              </div>
+              <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-surface-container text-on-surface-variant">14%</span>
+            </div>
+            <div class="p-2.5 rounded-lg bg-white border border-outline-variant/40 flex items-center justify-between">
+              <div>
+                <p class="text-xs font-semibold text-on-surface">Compressor com desgaste</p>
+                <p class="text-[10px] text-on-surface-variant">Ruído anormal na unidade externa</p>
+              </div>
+              <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-surface-container text-on-surface-variant">5%</span>
+            </div>
+          </div>
+        </details>
+      </div>
+    </article>
+
+    <!-- checklist -->
+    <details class="bg-white rounded-2xl border border-outline-variant shadow-sm overflow-hidden fade-in">
+      <summary class="flex items-center justify-between p-4 cursor-pointer select-none hover:bg-surface-container transition-all">
+        <div class="flex items-center gap-2">
+          <span class="material-symbols-outlined text-secondary" style="font-size:18px">fact_check</span>
+          <h3 class="text-sm font-bold text-on-surface">Checklist de Campo</h3>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-[9px] font-mono px-2 py-0.5 rounded-full bg-surface-container-high text-primary font-bold uppercase">3 Etapas</span>
+          <span class="material-symbols-outlined text-on-surface-variant" style="font-size:18px">expand_more</span>
+        </div>
+      </summary>
+      <div class="px-4 pb-4 pt-1 space-y-2 border-t border-outline-variant/30">
+        <div class="flex items-start gap-2.5 p-2 rounded-xl bg-surface-container-low/70 border border-outline-variant/40">
+          <div class="w-8 h-8 rounded-lg bg-surface-container-high flex items-center justify-center text-primary shrink-0">
+            <span class="material-symbols-outlined" style="font-size:16px">build</span>
+          </div>
+          <div>
+            <p class="text-[10px] font-mono text-secondary font-bold uppercase tracking-wide">Ferramentas</p>
+            <p class="text-xs font-semibold text-on-surface">Chave de fenda, multímetro, escova para aletas</p>
+          </div>
+        </div>
+        <div class="flex items-start gap-2.5 p-2 rounded-xl bg-surface-container-low/70 border border-outline-variant/40">
+          <div class="w-8 h-8 rounded-lg bg-surface-container-high flex items-center justify-center text-secondary shrink-0">
+            <span class="material-symbols-outlined" style="font-size:16px">health_and_safety</span>
+          </div>
+          <div>
+            <p class="text-[10px] font-mono text-secondary font-bold uppercase tracking-wide">EPIs Obrigatórios</p>
+            <p class="text-xs font-semibold text-on-surface">Luvas isolantes 🧤, Óculos de Proteção 🥽</p>
+          </div>
+        </div>
+        <div class="flex items-start gap-2.5 p-2 rounded-xl bg-surface-container-low/70 border border-outline-variant/40">
+          <div class="w-8 h-8 rounded-lg bg-surface-container-high flex items-center justify-center text-primary-container shrink-0">
+            <span class="material-symbols-outlined" style="font-size:16px">inventory_2</span>
+          </div>
+          <div>
+            <p class="text-[10px] font-mono text-secondary font-bold uppercase tracking-wide">Insumos & Peças</p>
+            <div class="flex items-center gap-2 flex-wrap">
+              <p class="text-xs font-semibold text-on-surface">1x Filtro de ar do split</p>
+              <span class="text-[9px] font-mono bg-surface-container px-1.5 py-0.5 rounded text-on-surface-variant font-bold">SKU #HVAC-1140</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </details>
+
+    </div><!-- /viewTecnica -->
+
+    <!-- actions -->
+    <div class="space-y-2.5 pb-2">
+      <button id="btnEnviar" class="w-full h-14 bg-primary-container text-white rounded-2xl px-6 text-sm font-bold flex items-center justify-center gap-3 shadow-[0_4px_16px_rgba(3,52,115,0.22)] active:scale-[0.98] transition-all hover:bg-primary" type="button">
+        <span class="material-symbols-outlined text-xl" style="font-variation-settings:'FILL' 1">send</span>
+        Aprovar OS e Enviar ao Técnico
+      </button>
+      <div class="grid grid-cols-2 gap-2.5">
+        <button class="h-11 bg-white border border-outline-variant text-on-surface rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 active:scale-95 hover:bg-surface-container transition-transform" type="button">
+          <span class="material-symbols-outlined text-on-surface-variant" style="font-size:16px">edit_note</span>
+          Adicionar Anotações
+        </button>
+        <button class="h-11 bg-white border border-outline-variant text-on-surface rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 active:scale-95 hover:bg-surface-container transition-transform" type="button">
+          <span class="material-symbols-outlined text-on-surface-variant" style="font-size:16px">sync_problem</span>
+          Revisar Diagnóstico
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- bottom nav -->
+  <nav class="absolute bottom-0 left-0 right-0 h-14 bg-white border-t border-outline-variant flex justify-around items-center px-4">
+    <a class="flex flex-col items-center justify-center text-on-surface-variant px-3 py-1 gap-0.5 w-16" href="#">
+      <span class="material-symbols-outlined text-xl">biotech</span>
+      <span class="text-[9px]">Diagnóstico</span>
+    </a>
+    <a class="flex flex-col items-center justify-center bg-primary-container text-white rounded-xl px-3 py-1 gap-0.5 w-16 relative" href="#">
+      <span class="absolute top-1 right-1.5 w-2 h-2 bg-error rounded-full ring-2 ring-white"></span>
+      <span class="material-symbols-outlined text-xl" style="font-variation-settings:'FILL' 1">assignment</span>
+      <span class="text-[9px] font-bold">Ordens</span>
+    </a>
+    <a class="flex flex-col items-center justify-center text-on-surface-variant px-3 py-1 gap-0.5 w-16" href="#">
+      <span class="material-symbols-outlined text-xl">build</span>
+      <span class="text-[9px]">Equipamentos</span>
+    </a>
+    <a class="flex flex-col items-center justify-center text-on-surface-variant px-3 py-1 gap-0.5 w-16" href="#">
+      <span class="material-symbols-outlined text-xl">person</span>
+      <span class="text-[9px]">Perfil</span>
+    </a>
+  </nav>
+</div>
+
+<!-- TELA 4 — SUCESSO / CONFIRMAÇÃO -->
+<div class="screen" id="s4">
+  <div class="flex flex-col items-center justify-center h-full px-8 text-center space-y-5 bg-white">
+    <div id="successCircle" class="w-24 h-24 rounded-full bg-emerald-100 border-4 border-emerald-400 flex items-center justify-center check-pop">
+      <span class="material-symbols-outlined text-emerald-600" style="font-size:48px;font-variation-settings:'FILL' 1">task_alt</span>
+    </div>
+    <div class="space-y-1">
+      <h2 class="text-xl font-bold text-primary">OS #9420-AC Enviada!</h2>
+      <p class="text-sm text-on-surface-variant">Técnico notificado e ordem de serviço registrada com sucesso.</p>
+    </div>
+    <div class="w-full bg-surface-container-low rounded-2xl p-4 text-left space-y-2 border border-outline-variant">
+      <div class="flex items-center justify-between">
+        <span class="text-xs text-on-surface-variant">Técnico Designado</span>
+        <span class="text-xs font-semibold text-primary">Carlos M.</span>
+      </div>
+      <div class="w-full h-px bg-outline-variant/30"></div>
+      <div class="flex items-center justify-between">
+        <span class="text-xs text-on-surface-variant">Prazo de Atendimento</span>
+        <span class="text-xs font-semibold text-primary">24h (Prioridade Média)</span>
+      </div>
+      <div class="w-full h-px bg-outline-variant/30"></div>
+      <div class="flex items-center justify-between">
+        <span class="text-xs text-on-surface-variant">Status</span>
+        <span class="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700">
+          <span class="w-2 h-2 rounded-full bg-emerald-500"></span>Em Rota
+        </span>
+      </div>
+    </div>
+    <button id="btnReset" class="w-full h-12 bg-primary-container text-white rounded-2xl text-sm font-bold active:scale-[0.98] transition-all" type="button">
+      Novo Diagnóstico
+    </button>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast">Enviando para o técnico...</div>
+
+</div><!-- #app -->
+
+<script>
+// ── UTILITÁRIOS ──
+function goTo(id) {
+  document.querySelectorAll('.screen').forEach(s => {
+    s.classList.remove('active','out');
+    if (s.id !== id) s.classList.add('out');
+  });
+  const next = document.getElementById(id);
+  next.classList.remove('out');
+  setTimeout(() => next.classList.add('active'), 10);
+}
+
+function showToast(msg, duration = 2200) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), duration);
+}
+
+// ── TELA 1: ENVIAR RELATÓRIO ──
+document.getElementById('btnEnviarRelatorio').addEventListener('click', () => {
+  const textarea = document.getElementById('relatorioText');
+  const texto = textarea.value.trim();
+  
+  if (!texto) {
+    showToast('Digite uma descrição do problema', 1500);
+    return;
+  }
+
+  // display do texto na tela 2
+  document.getElementById('relatorioDisplay').textContent = texto;
+  document.getElementById('evidRelato').textContent = '"' + texto + '"';
+  
+  const btn = document.getElementById('btnEnviarRelatorio');
+  btn.textContent = 'Enviando para análise...';
+  btn.disabled = true;
+  btn.classList.add('opacity-70');
+  
+  showToast('Descrição capturada — enviando para análise...', 1800);
+  setTimeout(() => goTo('s2'), 2000);
+});
+
+// Progressão dos steps ao entrar na tela 2
+const observer2 = new MutationObserver(() => {
+  const s2 = document.getElementById('s2');
+  if (s2.classList.contains('active')) {
+    observer2.disconnect();
+    startAIProgress();
+  }
+});
+observer2.observe(document.getElementById('s2'), {attributes: true, attributeFilter: ['class']});
+
+function startAIProgress() {
+  // step 2 → concluído após 2.5s
+  setTimeout(() => {
+    const s2icon = document.getElementById('step2icon');
+    const s2spinner = document.getElementById('step2spinner');
+    const s2status = document.getElementById('step2status');
+    const s2label = document.getElementById('step2label');
+    s2icon.className = 'w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 border border-emerald-300';
+    s2spinner.className = 'material-symbols-outlined';
+    s2spinner.style.fontSize = '14px';
+    s2spinner.textContent = 'check';
+    s2status.textContent = '100%';
+    s2status.className = 'text-[10px] text-emerald-700 font-mono font-semibold';
+
+    // step 3 → ativo
+    const s3row = document.getElementById('step3row');
+    const s3icon = document.getElementById('step3icon');
+    const s3spinner = document.getElementById('step3spinner');
+    const s3status = document.getElementById('step3status');
+    s3row.classList.remove('opacity-60');
+    s3icon.className = 'w-6 h-6 rounded-full bg-secondary-container/30 text-secondary flex items-center justify-center shrink-0 border border-secondary-container';
+    s3spinner.className = 'material-symbols-outlined spin-icon';
+    s3spinner.style.fontSize = '14px';
+    s3spinner.textContent = 'sync';
+    s3status.textContent = 'Ativo...';
+    s3status.className = 'text-[10px] text-secondary font-mono font-bold';
+    document.getElementById('aiTitle').textContent = 'Estimando falha e sobressalentes...';
+  }, 6000);
+
+  // step 3 → concluído após 4.5s
+  setTimeout(() => {
+    const s3icon = document.getElementById('step3icon');
+    const s3spinner = document.getElementById('step3spinner');
+    const s3status = document.getElementById('step3status');
+    s3icon.className = 'w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 border border-emerald-300';
+    s3spinner.className = 'material-symbols-outlined';
+    s3spinner.style.fontSize = '14px';
+    s3spinner.textContent = 'check';
+    s3status.textContent = '100%';
+    s3status.className = 'text-[10px] text-emerald-700 font-mono font-semibold';
+
+    const aiStatus = document.getElementById('aiStatus');
+    aiStatus.textContent = 'Concluído';
+    aiStatus.className = 'px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-mono font-semibold';
+    document.getElementById('aiTitle').textContent = 'Diagnóstico gerado com sucesso ✓';
+    showToast('Ordem de serviço gerada!', 1800);
+    setTimeout(() => goTo('s3'), 3000);
+  }, 12000);
+}
+
+// ── TELA 3: VISÃO GESTOR / TÉCNICA ──
+function setView(v) {
+  const g = document.getElementById('viewGestor');
+  const t = document.getElementById('viewTecnica');
+  const tg = document.getElementById('tabGestor');
+  const tt = document.getElementById('tabTecnico');
+  const on = 'bg-white text-primary shadow-sm';
+  const off = 'text-on-surface-variant';
+  g.classList.toggle('hidden', v !== 'gestor');
+  t.classList.toggle('hidden', v !== 'tecnico');
+  tg.className = 'flex-1 h-8 rounded-lg text-xs font-semibold transition-all ' + (v === 'gestor' ? on : off);
+  tt.className = 'flex-1 h-8 rounded-lg text-xs font-semibold transition-all ' + (v === 'tecnico' ? on : off);
+}
+setView('gestor');
+
+// ── TELA 3: APROVAÇÃO DO SUPERVISOR ──
+document.getElementById('btnEnviar').addEventListener('click', () => {
+  const btn = document.getElementById('btnEnviar');
+  btn.textContent = 'Aprovando...';
+  btn.disabled = true;
+  btn.classList.add('opacity-70');
+  showToast('OS aprovada pelo supervisor', 1800);
+  setTimeout(() => {
+    showToast('Notificando técnico Carlos M...', 1800);
+  }, 1200);
+  setTimeout(() => goTo('s4'), 3000);
+});
+
+// ── TELA 4: RESET ──
+document.getElementById('btnReset').addEventListener('click', () => {
+  // resetar textarea
+  document.getElementById('relatorioText').value = '';
+  
+  const btnEnvRelatorio = document.getElementById('btnEnviarRelatorio');
+  btnEnvRelatorio.innerHTML = '<span class="material-symbols-outlined text-lg" style="font-variation-settings:\'FILL\' 1">send</span> <span>Enviar para Análise</span>';
+  btnEnvRelatorio.disabled = false;
+  btnEnvRelatorio.classList.remove('opacity-70');
+
+  const btnEnv = document.getElementById('btnEnviar');
+  btnEnv.innerHTML = '<span class="material-symbols-outlined text-xl" style="font-variation-settings:\'FILL\' 1">send</span> Aprovar OS e Enviar ao Técnico';
+  btnEnv.disabled = false;
+  btnEnv.classList.remove('opacity-70');
+  setView('gestor');
+
+  // resetar AI steps
+  const step2icon = document.getElementById('step2icon');
+  step2icon.className = 'w-6 h-6 rounded-full bg-secondary-container/30 text-secondary flex items-center justify-center shrink-0 border border-secondary-container';
+  const s2spin = document.getElementById('step2spinner');
+  s2spin.className = 'material-symbols-outlined spin-icon'; s2spin.textContent = 'sync';
+  document.getElementById('step2status').textContent = 'Ativo...';
+  document.getElementById('step2status').className = 'text-[10px] text-secondary font-mono font-bold';
+  document.getElementById('step3row').classList.add('opacity-60');
+  const s3icon = document.getElementById('step3icon');
+  s3icon.className = 'w-6 h-6 rounded-full bg-surface-container text-outline flex items-center justify-center shrink-0 border border-outline-variant';
+  const s3spin = document.getElementById('step3spinner');
+  s3spin.className = 'material-symbols-outlined'; s3spin.textContent = 'radio_button_unchecked';
+  document.getElementById('step3status').textContent = 'Aguardando';
+  document.getElementById('step3status').className = 'text-[10px] text-outline font-mono';
+  document.getElementById('aiStatus').textContent = 'Processando';
+  document.getElementById('aiStatus').className = 'px-2 py-0.5 rounded-full bg-secondary-container/20 text-on-secondary-container text-[10px] font-mono font-semibold animate-pulse';
+  document.getElementById('aiTitle').textContent = 'Analisando relato, cruzando com o manual técnico...';
+
+  // re-observar tela 2
+  const obs = new MutationObserver(() => {
+    if (document.getElementById('s2').classList.contains('active')) {
+      obs.disconnect(); startAIProgress();
+    }
+  });
+  obs.observe(document.getElementById('s2'), {attributes:true, attributeFilter:['class']});
+
+  goTo('s0');
+});
+</script>
+</body>
+</html>
